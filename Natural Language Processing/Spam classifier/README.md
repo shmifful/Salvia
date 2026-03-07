@@ -7,6 +7,44 @@
 </details>
 
 # How to use
+## Spam Filter endpoint
+```
+https://api.salvia.dev/spam/
+```
+
+## Input
+```python
+text: str
+```
+
+## Output
+```python
+dict : {
+    "is_spam": True | False,
+    "confidence": float # range between 0 and 1
+}
+```
+
+## Raises 
+`400`: No input text provided. 
+
+`503`: Model is not loaded and ready.
+
+## Usage
+You can try this endpoint yourself (and many more) at [api.salvia.dev/docs](api.salvia.dev/docs).
+### `python`
+```py
+import requests
+
+URL = "https://api.salvia.dev/spam/" 
+text = "Congratulations! You have won a free iPhone. Click here to claim." 
+res = requests.post(URL, , json={"text": text})
+
+print(res.json())
+# Output: {'is_spam': True, 'confidence': 0.959}
+```
+`NOTE`: the API will return an error if the request is not a valid JSON.
+
 
 # Model structure
 When searching for a dataset to use to train the model, this dataset by [UCI Machine Learning](https://www.kaggle.com/datasets/uciml/sms-spam-collection-dataset) was the most prominent one, as it is the most upvoted on Kaggle for spam classification and most used by other people. 

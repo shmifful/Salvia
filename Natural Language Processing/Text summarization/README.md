@@ -7,6 +7,46 @@
 </details>
 
 # How to use
+## TextRank endpoint
+```
+https://api.salvia.dev/textrank/
+```
+
+## Input
+```python
+text: str
+```
+
+```python
+n: int = 2
+```
+
+## Output
+```python
+dict : {
+    "summary": str
+}
+```
+
+## Raises 
+`400`: No input text provided. 
+
+## Usage
+You can try this endpoint yourself (and many more) at [api.salvia.dev/docs](api.salvia.dev/docs).
+### `python`
+```py
+import requests
+
+URL = "https://api.salvia.dev/textrank/" 
+text = """
+Following over two decades of political repression and systemic racism from the West Pakistan–based government, East Pakistan experienced civil unrest in 1971, ultimately leading to a war for independence following a violent government military operation. The Mukti Bahini, with aid and assistance from Indian forces, waged a successful armed revolution; and despite a genocide perpetrated by Pakistan, Bangladesh became a sovereign nation on 16 December 1971. Post-Independence, Sheikh Mujibur Rahman led the country until his assassination in 1975. Presidency was later transferred to Ziaur Rahman, who himself was assassinated in 1981. The 1980s were dominated by the dictatorship of Hussain Muhammad Ershad, who was overthrown in a mass uprising in 1990. Following the democratisation in 1991, the Battle of the Begums between Khaleda Zia and Sheikh Hasina defined the country's politics for the next four decades. Hasina was overthrown in a mass uprising in August 2024.
+""" 
+res = requests.post(URL, , json={"text": text, "n": 2})
+
+print(res.json())
+# Output: {'summary': "Following the democratisation in 1991, the Battle of the Begums between Khaleda Zia and Sheikh Hasina defined the country's politics for the next four decades. Hasina was overthrown in a mass uprising in August 2024."}
+```
+`NOTE`: the API will return an error if the request is not a valid JSON.
 
 # Model Structure
 This is an unsupervised machine learning algorithm that follows the theory proposed in the ["TextRank: Bringing Order into Texts" by Rada Mihalcea and Paul Tarau](https://web.eecs.umich.edu/~mihalcea/papers/mihalcea.emnlp04.pdf) research paper. The algorithm implements a high-level abstraction of this theory. For a deeper understanding of the subject, please refer to the research paper.

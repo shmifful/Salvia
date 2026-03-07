@@ -7,13 +7,15 @@
 </details>
 
 # How to use 
-## Sentiment analysis endpoint
+## Sentiment Analysis endpoint
 ```
 https://api.salvia.dev/sentiment/
 ```
 
 ## Input
-`string`
+```python
+text: str
+```
 
 ## Output
 ```python
@@ -31,17 +33,17 @@ dict : {
 ## Usage
 You can try this endpoint yourself (and many more) at [api.salvia.dev/docs](api.salvia.dev/docs).
 ### `python`
-```py
+```python
 import requests
 
 URL = "https://api.salvia.dev/sentiment/" 
-s = "I love pizza" 
-res = requests.get(URL + s)
+text = "I love pizza" 
+res = requests.post(URL, , json={"text": text})
 
-print(res.text)
-# Output: {"sentiment":"positive","confidence":0.96}
+print(res.json())
+# Output: {'sentiment': 'positive', 'confidence': 0.956}
 ```
-`NOTE`: the API returns a string, you may want to convert it to `dict`.
+`NOTE`: the API will return an error if the request is not a valid JSON.
 
 # Model structure
 This model uses a `Linear Support Vector Machine (LinearSVC)`. Rather than just counting the words, the model uses a hybrid approach to try understand the context of the string.
