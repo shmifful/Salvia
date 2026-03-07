@@ -7,9 +7,9 @@ from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import networkx as nx
-import nltk
-nltk.download("punkt")
 from nltk.tokenize import sent_tokenize
+
+from schemas import TextRank, JustText
 
 SENTIMENT_MODEL_PATH = Path("sentiment_classifier.pkl")
 sentiments = ["negative", "neutral", "positive"]
@@ -36,8 +36,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.post("/sentiment/{text}")
-def read_text_sentiment(text: Union[str, None] = None):
+@app.post("/sentiment/")
+def read_text_sentiment(request: JustText):
     """
     Analyze the sentiment of a given text string.
 
@@ -53,7 +53,10 @@ def read_text_sentiment(text: Union[str, None] = None):
     Raises:
         400: No input text provided.
         503: Model is not loaded and ready.
+
+    NOTE: the API will return an error if the request is not a valid JSON.
     """
+    text = request.text
     if not text:
         raise HTTPException(status_code=400, detail="No input text provided.")
 
@@ -74,8 +77,8 @@ def read_text_sentiment(text: Union[str, None] = None):
     }
     return response
 
-@app.post("/spam/{text}")
-def read_text_spam(text: Union[str, None] = None):
+@app.post("/spam/")
+def read_text_spam(request: JustText):
     """
     Analyze whether a given text is spam or not.
 
@@ -84,14 +87,17 @@ def read_text_spam(text: Union[str, None] = None):
 
     Returns:
         dict: {
-            "sentiment": True | False,
+            "is_spam": True | False,
             "confidence": float  # between 0 and 1
         }
 
     Raises:
         400: No input text provided.
         503: Model is not loaded and ready.
+
+    NOTE: the API will return an error if the request is not a valid JSON.
     """
+    text = request.text
     if not text:
         raise HTTPException(status_code=400, detail="No input text provided.")
 
@@ -112,8 +118,8 @@ def read_text_spam(text: Union[str, None] = None):
     }
     return response
 
-@app.post("/textrank/{text}")
-def read_text_textrank(text: Union[str, None] = None, n: int = 2):
+@app.post("/textrank/")
+def read_text_textrank(request: TextRank):
     """
     Summarizes long texts, extracting n most important sentences and returning it in the original order.
 
@@ -128,7 +134,11 @@ def read_text_textrank(text: Union[str, None] = None, n: int = 2):
 
     Raises:
         400: No input text provided.
+    
+    NOTE: the API will return an error if the request is not a valid JSON.
     """
+    text = request.text.replace("\n", " ").replace("\r", " ").strip()
+    n = request.n
     if not text:
         raise HTTPException(status_code=400, detail="No input text provided.")
     
