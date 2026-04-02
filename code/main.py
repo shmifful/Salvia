@@ -1,5 +1,7 @@
-from typing import Union
-from fastapi import FastAPI, HTTPException
+import os
+from dotenv import load_dotenv
+from supabase import create_client, Client
+from fastapi import FastAPI, HTTPException, Security, Depends
 from contextlib import asynccontextmanager
 import joblib
 import numpy as np
@@ -8,13 +10,45 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import networkx as nx
 from nltk.tokenize import sent_tokenize
-
+from fastapi.security import APIKeyHeader
 from schemas import TextRank, JustText
+import time
+
+load_dotenv()
 
 SENTIMENT_MODEL_PATH = Path("sentiment_classifier.pkl")
 sentiments = ["negative", "neutral", "positive"]
 
 SPAM_MODEL_PATH = Path("spam_classifier.pkl")
+
+# Get supabase creds
+url: str = os.environ.get("SUPABASE_URL")
+key: str = os.environ.get("SUPABASE_KEY")
+supabase: Client = create_client(url, key)
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+# Verify key
+async def validate_api_key(api_key: str = Security(api_key_header)):
+    if not api_key:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing API key"
+        )
+    
+    # Checks if the API key exists in the DB
+    response = (
+        supabase.table("api_keys")
+        .select("user_id")
+        .eq("api_key", api_key)
+        .execute()
+    )
+
+    if not response.data:
+        raise HTTPException(
+            status_code=403, 
+            detail="Invalid API key"
+        )
+    
 
 # Lifespan event handler
 @asynccontextmanager
@@ -36,8 +70,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.post("/sentiment/")
-def read_text_sentiment(request: JustText):
+@app.post("/nlp/sentiment/")
+def read_text_sentiment(
+    request: JustText,
+    user_info: dict = Depends(validate_api_key)
+    ):
     """
     Analyze the sentiment of a given text string.
 
@@ -56,6 +93,8 @@ def read_text_sentiment(request: JustText):
 
     NOTE: the API will return an error if the request is not a valid JSON.
     """
+    start_time = time.perf_counter()
+
     text = request.text
     if not text:
         raise HTTPException(status_code=400, detail="No input text provided.")
@@ -71,14 +110,22 @@ def read_text_sentiment(request: JustText):
 
     # Calculates the confidence 
     confidence = pred.max()
+
+    end_time = time.perf_counter()
+    latency = int((end_time - start_time) * 1000)
+
     response = {
         "sentiment": sentiments[pred.argmax()],
-        "confidence": round(confidence, 3)
+        "confidence": round(confidence, 3),
+        "latency": latency
     }
     return response
 
-@app.post("/spam/")
-def read_text_spam(request: JustText):
+@app.post("/nlp/spam/")
+def read_text_spam(
+    request: JustText,
+    user_info: dict = Depends(validate_api_key)
+    ):
     """
     Analyze whether a given text is spam or not.
 
@@ -97,6 +144,8 @@ def read_text_spam(request: JustText):
 
     NOTE: the API will return an error if the request is not a valid JSON.
     """
+    start_time = time.perf_counter()
+
     text = request.text
     if not text:
         raise HTTPException(status_code=400, detail="No input text provided.")
@@ -112,14 +161,21 @@ def read_text_spam(request: JustText):
     # Retrieves the confindence of the prediction
     confidence = max(app.state.spam_model.predict_proba([text])[0])
 
+    end_time = time.perf_counter()
+    latency = int((end_time - start_time) * 1000)
+
     response = {
         "is_spam": spam,
-        "confidence": round(confidence, 3)
+        "confidence": round(confidence, 3),
+        "latency": latency
     }
     return response
 
-@app.post("/textrank/")
-def read_text_textrank(request: TextRank):
+@app.post("/nlp/textrank/")
+def read_text_textrank(
+    request: TextRank,
+    user_info: dict = Depends(validate_api_key)
+    ):
     """
     Summarizes long texts, extracting n most important sentences and returning it in the original order.
 
@@ -137,6 +193,8 @@ def read_text_textrank(request: TextRank):
     
     NOTE: the API will return an error if the request is not a valid JSON.
     """
+    start_time = time.perf_counter()
+
     text = request.text.replace("\n", " ").replace("\r", " ").strip()
     n = request.n
     if not text:
@@ -168,7 +226,11 @@ def read_text_textrank(request: TextRank):
     # Return the most n most important sentences 
     summary = " ".join([sentences[i] for i in top_indices])
 
+    end_time = time.perf_counter()
+    latency = int((end_time - start_time) * 1000)
+
     response = {
-        "summary": summary
+        "summary": summary,
+        "latency": latency
     }
     return response
