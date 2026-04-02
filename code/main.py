@@ -53,7 +53,7 @@ async def validate_api_key(api_key: str = Security(api_key_header)):
     return api_key
 
 # Write data in DB
-async def call_to_db(api_key, endpoint, status, data=None, res=None, latency=0):
+async def track_usage(api_key, endpoint, status, data=None, res=None, latency=0):
     response = (supabase
         .table("usage")
         .insert({
@@ -115,9 +115,21 @@ async def read_text_sentiment(
 
     text = request.text
     if not text:
+        bgTask.add_task(
+            track_usage,
+            api_key=key,
+            endpoint="/nlp/sentiment",
+            status=400
+        )
         raise HTTPException(status_code=400, detail="No input text provided.")
 
     if app.state.sentiment_model is None:
+        bgTask.add_task(
+            track_usage,
+            api_key=key,
+            endpoint="/nlp/sentiment",
+            status=503
+        )
         raise HTTPException(status_code=503, detail="Model failed to load.")
     
     print("Checking sentiment for: ", text)
@@ -137,7 +149,7 @@ async def read_text_sentiment(
         "confidence": round(confidence, 3)
     }
 
-    bgTask.add_task(call_to_db, 
+    bgTask.add_task(track_usage, 
                     api_key=key, 
                     endpoint="/nlp/sentiment",
                     data={"text": text},
@@ -176,9 +188,21 @@ def read_text_spam(
 
     text = request.text
     if not text:
+        bgTask.add_task(
+            track_usage,
+            api_key=key,
+            endpoint="/nlp/spam",
+            status=400
+        )
         raise HTTPException(status_code=400, detail="No input text provided.")
 
     if app.state.spam_model is None:
+        bgTask.add_task(
+            track_usage,
+            api_key=key,
+            endpoint="/nlp/spam",
+            status=503
+        )
         raise HTTPException(status_code=503, detail="Model failed to load.")
     
     print("Checking spam for:", text)
@@ -197,7 +221,7 @@ def read_text_spam(
         "confidence": round(confidence, 3)
     }
 
-    bgTask.add_task(call_to_db, 
+    bgTask.add_task(track_usage, 
                     api_key=key, 
                     endpoint="/nlp/spam",
                     data={"text": text},
@@ -236,6 +260,12 @@ def read_text_textrank(
     text = request.text.replace("\n", " ").replace("\r", " ").strip()
     n = request.n
     if not text:
+        bgTask.add_task(
+            track_usage,
+            api_key=key,
+            endpoint="/nlp/textrank",
+            status=400
+        )
         raise HTTPException(status_code=400, detail="No input text provided.")
     
     print("Shortening this text:", text)
@@ -271,7 +301,7 @@ def read_text_textrank(
         "summary": summary
     }
 
-    bgTask.add_task(call_to_db, 
+    bgTask.add_task(track_usage, 
                     api_key=key, 
                     endpoint="/nlp/text",
                     data={
