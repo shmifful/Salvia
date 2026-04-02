@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from fastapi import FastAPI, HTTPException, Security, Depends
+from fastapi import FastAPI, HTTPException, Security, Depends, BackgroundTasks
 from contextlib import asynccontextmanager
 import joblib
 import numpy as np
@@ -23,12 +23,13 @@ SPAM_MODEL_PATH = Path("spam_classifier.pkl")
 
 # Get supabase creds
 url: str = os.environ.get("SUPABASE_URL")
-key: str = os.environ.get("SUPABASE_KEY")
+key: str = os.environ.get("SUPABASE_SERVICE_ROLE")
 supabase: Client = create_client(url, key)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 # Verify key
 async def validate_api_key(api_key: str = Security(api_key_header)):
+    # TODO: Don't let users regenerate key to reset their usage
     if not api_key:
         raise HTTPException(
             status_code=401,
@@ -49,7 +50,23 @@ async def validate_api_key(api_key: str = Security(api_key_header)):
             detail="Invalid API key"
         )
     
+    return api_key
 
+# Write data in DB
+async def call_to_db(api_key, endpoint, status, data=None, res=None, latency=0):
+    response = (supabase
+        .table("usage")
+        .insert({
+            "api_key": api_key,
+            "endpoint": endpoint,
+            "data": data,
+            "response": res,
+            "status": status,
+            "latency": latency
+        })
+        .execute()
+    )
+    
 # Lifespan event handler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -70,10 +87,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-@app.post("/nlp/sentiment/")
-def read_text_sentiment(
+@app.post("/nlp/sentiment")
+async def read_text_sentiment(
     request: JustText,
-    user_info: dict = Depends(validate_api_key)
+    bgTask: BackgroundTasks,
+    key: dict = Depends(validate_api_key),
     ):
     """
     Analyze the sentiment of a given text string.
@@ -116,15 +134,25 @@ def read_text_sentiment(
 
     response = {
         "sentiment": sentiments[pred.argmax()],
-        "confidence": round(confidence, 3),
-        "latency": latency
+        "confidence": round(confidence, 3)
     }
+
+    bgTask.add_task(call_to_db, 
+                    api_key=key, 
+                    endpoint="/nlp/sentiment",
+                    data={"text": text},
+                    res=response,
+                    status=200,
+                    latency=latency
+                    )
+
     return response
 
-@app.post("/nlp/spam/")
+@app.post("/nlp/spam")
 def read_text_spam(
     request: JustText,
-    user_info: dict = Depends(validate_api_key)
+    bgTask: BackgroundTasks,
+    key: dict = Depends(validate_api_key)
     ):
     """
     Analyze whether a given text is spam or not.
@@ -166,15 +194,25 @@ def read_text_spam(
 
     response = {
         "is_spam": spam,
-        "confidence": round(confidence, 3),
-        "latency": latency
+        "confidence": round(confidence, 3)
     }
+
+    bgTask.add_task(call_to_db, 
+                    api_key=key, 
+                    endpoint="/nlp/spam",
+                    data={"text": text},
+                    res=response,
+                    status=200,
+                    latency=latency
+                    )
+    
     return response
 
-@app.post("/nlp/textrank/")
+@app.post("/nlp/textrank")
 def read_text_textrank(
     request: TextRank,
-    user_info: dict = Depends(validate_api_key)
+    bgTask: BackgroundTasks,
+    key: dict = Depends(validate_api_key)
     ):
     """
     Summarizes long texts, extracting n most important sentences and returning it in the original order.
@@ -230,7 +268,18 @@ def read_text_textrank(
     latency = int((end_time - start_time) * 1000)
 
     response = {
-        "summary": summary,
-        "latency": latency
+        "summary": summary
     }
+
+    bgTask.add_task(call_to_db, 
+                    api_key=key, 
+                    endpoint="/nlp/text",
+                    data={
+                        "text": text,
+                        "n": n
+                    },
+                    res=response,
+                    status=200,
+                    latency=latency
+                    )
     return response
