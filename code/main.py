@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from fastapi import FastAPI, HTTPException, Security, Depends, BackgroundTasks, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from contextlib import asynccontextmanager
 import joblib
 import numpy as np
@@ -11,6 +11,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 import networkx as nx
 from nltk.tokenize import sent_tokenize
 from fastapi.security import APIKeyHeader
+from fastapi.responses import JSONResponse
 from schemas import TextRank, JustText
 import time
 
@@ -26,31 +27,6 @@ url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_SERVICE_ROLE")
 supabase: Client = create_client(url, key)
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-# Verify key
-async def validate_api_key(api_key: str = Security(api_key_header)):
-    # TODO: Don't let users regenerate key to reset their usage
-    if not api_key:
-        raise HTTPException(
-            status_code=401,
-            detail="Missing API key"
-        )
-    
-    # Checks if the API key exists in the DB
-    response = (
-        supabase.table("api_keys")
-        .select("user_id")
-        .eq("api_key", api_key)
-        .execute()
-    )
-
-    if not response.data:
-        raise HTTPException(
-            status_code=403, 
-            detail="Invalid API key"
-        )
-    
-    return api_key
 
 # Write data in DB
 async def track_usage(api_key, endpoint, status, data=None, res=None, latency=0):
@@ -90,14 +66,35 @@ app = FastAPI(lifespan=lifespan)
 async def log_all_requests(request: Request, call_next):
     start_time = time.perf_counter()
     
-    # Process the request
-    response = await call_next(request)
-    
     # Calculate latency
     latency = int((time.perf_counter() - start_time) * 1000)
     
     # Get the API Key from headers manually
     api_key = request.headers.get("X-API-Key")
+
+    if not api_key or api_key == "":
+        return JSONResponse(
+            status_code=401,
+            content={"detail": "Missing API key"}
+        )
+
+    # Checks if the API key exists in the DB
+    res = (
+        supabase.table("api_keys")
+        .select("api_key")
+        .eq("api_key", api_key)
+        .execute()
+    )
+
+    # Verify key
+    if not res.data:
+        return JSONResponse(
+            status_code=403, 
+            content={"detail":"Invalid API key"}
+        )
+    
+    # Process the request
+    response = await call_next(request)
     
     if api_key and response.status_code != 200:
         await track_usage(
@@ -111,9 +108,9 @@ async def log_all_requests(request: Request, call_next):
 
 @app.post("/nlp/sentiment")
 async def read_text_sentiment(
-    request: JustText,
-    bgTask: BackgroundTasks,
-    key: dict = Depends(validate_api_key),
+    request: Request,
+    payload: JustText,
+    bgTask: BackgroundTasks
     ):
     """
     Analyze the sentiment of a given text string.
@@ -135,7 +132,8 @@ async def read_text_sentiment(
     """
     start_time = time.perf_counter()
 
-    text = request.text
+    key = request.headers.get("X-API-Key")
+    text = payload.text
     if not text:
         raise HTTPException(status_code=400, detail="No input text provided.")
 
@@ -172,9 +170,9 @@ async def read_text_sentiment(
 
 @app.post("/nlp/spam")
 def read_text_spam(
-    request: JustText,
-    bgTask: BackgroundTasks,
-    key: dict = Depends(validate_api_key)
+    request: Request,
+    payload: JustText,
+    bgTask: BackgroundTasks
     ):
     """
     Analyze whether a given text is spam or not.
@@ -196,7 +194,8 @@ def read_text_spam(
     """
     start_time = time.perf_counter()
 
-    text = request.text
+    key = request.headers.get("X-API-Key")
+    text = payload.text
     if not text:
         raise HTTPException(status_code=400, detail="No input text provided.")
 
@@ -232,9 +231,9 @@ def read_text_spam(
 
 @app.post("/nlp/textrank")
 def read_text_textrank(
-    request: TextRank,
-    bgTask: BackgroundTasks,
-    key: dict = Depends(validate_api_key)
+    request: Request,
+    payload: TextRank,
+    bgTask: BackgroundTasks
     ):
     """
     Summarizes long texts, extracting n most important sentences and returning it in the original order.
@@ -255,8 +254,9 @@ def read_text_textrank(
     """
     start_time = time.perf_counter()
 
-    text = request.text.replace("\n", " ").replace("\r", " ").strip()
-    n = request.n
+    key = request.headers.get("X-API-Key")
+    text = payload.text.replace("\n", " ").replace("\r", " ").strip()
+    n = payload.n
     if not text:
         raise HTTPException(status_code=400, detail="No input text provided.")
     
