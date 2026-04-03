@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from fastapi import FastAPI, HTTPException, Security, Depends, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Security, Depends, BackgroundTasks, Request
 from contextlib import asynccontextmanager
 import joblib
 import numpy as np
@@ -84,8 +84,30 @@ async def lifespan(app: FastAPI):
     # Shutdown logic here if needed
     print("Shutting down...")
 
-
 app = FastAPI(lifespan=lifespan)
+
+@app.middleware("http")
+async def log_all_requests(request: Request, call_next):
+    start_time = time.perf_counter()
+    
+    # Process the request
+    response = await call_next(request)
+    
+    # Calculate latency
+    latency = int((time.perf_counter() - start_time) * 1000)
+    
+    # Get the API Key from headers manually
+    api_key = request.headers.get("X-API-Key")
+    
+    if api_key and response.status_code != 200:
+        await track_usage(
+            api_key=api_key, 
+            endpoint=request.url.path, 
+            status=response.status_code, 
+            latency=latency
+        )
+        
+    return response
 
 @app.post("/nlp/sentiment")
 async def read_text_sentiment(
@@ -115,21 +137,9 @@ async def read_text_sentiment(
 
     text = request.text
     if not text:
-        bgTask.add_task(
-            track_usage,
-            api_key=key,
-            endpoint="/nlp/sentiment",
-            status=400
-        )
         raise HTTPException(status_code=400, detail="No input text provided.")
 
     if app.state.sentiment_model is None:
-        bgTask.add_task(
-            track_usage,
-            api_key=key,
-            endpoint="/nlp/sentiment",
-            status=503
-        )
         raise HTTPException(status_code=503, detail="Model failed to load.")
     
     print("Checking sentiment for: ", text)
@@ -188,21 +198,9 @@ def read_text_spam(
 
     text = request.text
     if not text:
-        bgTask.add_task(
-            track_usage,
-            api_key=key,
-            endpoint="/nlp/spam",
-            status=400
-        )
         raise HTTPException(status_code=400, detail="No input text provided.")
 
     if app.state.spam_model is None:
-        bgTask.add_task(
-            track_usage,
-            api_key=key,
-            endpoint="/nlp/spam",
-            status=503
-        )
         raise HTTPException(status_code=503, detail="Model failed to load.")
     
     print("Checking spam for:", text)
@@ -260,12 +258,6 @@ def read_text_textrank(
     text = request.text.replace("\n", " ").replace("\r", " ").strip()
     n = request.n
     if not text:
-        bgTask.add_task(
-            track_usage,
-            api_key=key,
-            endpoint="/nlp/textrank",
-            status=400
-        )
         raise HTTPException(status_code=400, detail="No input text provided.")
     
     print("Shortening this text:", text)
