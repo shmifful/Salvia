@@ -9,7 +9,7 @@
 # How to use
 ## Spam Filter endpoint
 ```
-https://api.salvia.dev/spam/
+https://api.salvia.dev/nlp/spam/
 ```
 
 ## Input
@@ -31,14 +31,16 @@ dict : {
 `503`: Model is not loaded and ready.
 
 ## Usage
-You can try this endpoint yourself (and many more) at [api.salvia.dev/docs](https://api.salvia.dev/docs).
+You can try this endpoint yourself (and many more) at [salvia.dev/](https://salvia.dev/).
 ### `python`
 ```py
 import requests
 
-URL = "https://api.salvia.dev/spam/" 
+URL = "https://api.salvia.dev/nlp/spam/" 
 text = "Congratulations! You have won a free iPhone. Click here to claim." 
-res = requests.post(URL, , json={"text": text})
+headers={"X-API-Key": "salvia_your_api"}
+
+res = requests.post(URL, , headers=headers, json={"text": text})
 
 print(res.json())
 # Output: {'is_spam': True, 'confidence': 0.959}

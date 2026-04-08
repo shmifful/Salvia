@@ -9,7 +9,7 @@
 # How to use
 ## TextRank endpoint
 ```
-https://api.salvia.dev/textrank/
+https://api.salvia.dev/nlp/textrank/
 ```
 
 ## Input
@@ -32,19 +32,21 @@ dict : {
 `400`: No input text provided. 
 
 ## Usage
-You can try this endpoint yourself (and many more) at [api.salvia.dev/docs](https://api.salvia.dev/docs).
+You can try this endpoint yourself (and many more) at [salvia.dev/](https://salvia.dev/).
 ### `python`
 ```py
 import requests
 
-URL = "https://api.salvia.dev/textrank/" 
+URL = "https://api.salvia.dev/nlp/textrank/" 
 text = """
-Following over two decades of political repression and systemic racism from the West Pakistan–based government, East Pakistan experienced civil unrest in 1971, ultimately leading to a war for independence following a violent government military operation. The Mukti Bahini, with aid and assistance from Indian forces, waged a successful armed revolution; and despite a genocide perpetrated by Pakistan, Bangladesh became a sovereign nation on 16 December 1971. Post-Independence, Sheikh Mujibur Rahman led the country until his assassination in 1975. Presidency was later transferred to Ziaur Rahman, who himself was assassinated in 1981. The 1980s were dominated by the dictatorship of Hussain Muhammad Ershad, who was overthrown in a mass uprising in 1990. Following the democratisation in 1991, the Battle of the Begums between Khaleda Zia and Sheikh Hasina defined the country's politics for the next four decades. Hasina was overthrown in a mass uprising in August 2024.
-""" 
-res = requests.post(URL, , json={"text": text, "n": 2})
+      Your text
+      """ 
+headers={"X-API-Key": "salvia_your_api"}
+
+res = requests.post(URL, headers=headers, json={"text": text, "n": 2})
 
 print(res.json())
-# Output: {'summary': "Following the democratisation in 1991, the Battle of the Begums between Khaleda Zia and Sheikh Hasina defined the country's politics for the next four decades. Hasina was overthrown in a mass uprising in August 2024."}
+# Output: {'summary': "Your summary."}
 ```
 `NOTE`: the API will return an error if the request is not a valid JSON.
 

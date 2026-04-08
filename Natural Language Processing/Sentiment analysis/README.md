@@ -9,7 +9,7 @@
 # How to use 
 ## Sentiment Analysis endpoint
 ```
-https://api.salvia.dev/sentiment/
+https://api.salvia.dev/nlp/sentiment/
 ```
 
 ## Input
@@ -31,14 +31,16 @@ dict : {
 `503`: Model is not loaded and ready.
 
 ## Usage
-You can try this endpoint yourself (and many more) at [api.salvia.dev/docs](https://api.salvia.dev/docs).
+You can try this endpoint yourself (and many more) at [salvia.dev/](https://salvia.dev/).
 ### `python`
 ```python
 import requests
 
-URL = "https://api.salvia.dev/sentiment/" 
+URL = "https://api.salvia.dev/nlp/sentiment/" 
+headers={"X-API-Key": "salvia_your_api"}
 text = "I love pizza" 
-res = requests.post(URL, , json={"text": text})
+
+res = requests.post(URL, headers=headers, json={"text": text})
 
 print(res.json())
 # Output: {'sentiment': 'positive', 'confidence': 0.956}
