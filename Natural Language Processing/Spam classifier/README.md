@@ -40,7 +40,7 @@ URL = "https://api.salvia.dev/nlp/spam/"
 text = "Congratulations! You have won a free iPhone. Click here to claim." 
 headers={"X-API-Key": "salvia_your_api"}
 
-res = requests.post(URL, , headers=headers, json={"text": text})
+res = requests.post(URL, headers=headers, json={"text": text})
 
 print(res.json())
 # Output: {'is_spam': True, 'confidence': 0.959}
